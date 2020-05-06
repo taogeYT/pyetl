@@ -11,25 +11,26 @@ with open('pyetl/__init__.py', 'rb') as f:
 setup(
     name='pyetl',
     version=version,
-    install_requires=[
-        'pandas>=0.19.0',
-        'pydbclib>=1.2.1',
-        'python-dateutil>=2.5.0'],
-    description='python etl frame for small dataset',
+    install_requires=['pydbclib>=2.1.5'],
+    description='Python ETL Frame',
     classifiers=[
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
-        'Operating System :: OS Independent',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
-    author='lyt',
+    author='liyatao',
     url='https://github.com/taogeYT/pyetl',
-    author_email='liyt@vastio.com',
-    license='MIT',
+    author_email='li_yatao@outlook.com',
+    license='Apache 2.0',
     packages=find_packages(),
-    include_package_data=True,
-    zip_safe=False,
-    entry_points={
-        'console_scripts': ['pyetl = pyetl.cli:main']
-    }
+    include_package_data=False,
+    zip_safe=True,
+    python_requires='>=3.6',
+    # entry_points={
+    #     'console_scripts': ['pyetl = pyetl.cli:main']
+    # }
 )

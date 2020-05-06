@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-
-__author__ = "lyt"
-
 """
-    python etl frame based on pandas for small dataset
+@time: 2020/4/30 11:27 上午
+@desc: python etl frame based on pandas for small dataset
 """
-__version__ = '2.3.0'
+from .task import Task
+from .reader import Reader
+from .writer import Writer
+from .mapping import Mapping
 
-__all__ = ['Etl']
-
-from .app import Etl
+__version__ = '2.0.0'
+__author__ = "liyatao"
