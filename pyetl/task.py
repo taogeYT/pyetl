@@ -13,8 +13,21 @@ class Task(object):
         self.mapping = mapping
         self.mapping.register(self.reader, self.writer)
 
+    def run(self, method="start"):
+        if method == "start":
+            self.start()
+        if method == "test":
+            self.test()
+
     def start(self):
         self.load(self.transform(self.extract()))
+
+    def test(self):
+        dataset = self.transform(self.extract())
+        if hasattr(dataset, "to_df"):
+            print(dataset.limit(10).to_df())
+        else:
+            print(list(dataset.limit(10)))
 
     def extract(self):
         return self.reader.read(self.mapping)

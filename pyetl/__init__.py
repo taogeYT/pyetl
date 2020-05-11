@@ -5,8 +5,8 @@
 """
 from .task import Task
 from .reader import Reader
-from .writer import Writer
+from .writer import Writer, ESWriter, HiveWriter
 from .mapping import Mapping
 
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 __author__ = "liyatao"
