@@ -11,7 +11,7 @@ with open('pyetl/__init__.py', 'rb') as f:
 setup(
     name='pyetl',
     version=version,
-    install_requires=['pydbclib>=2.1.5'],
+    install_requires=['pydbclib>=2.1.6'],
     description='Python ETL Frame',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
