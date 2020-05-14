@@ -5,7 +5,7 @@
 """
 from .task import Task
 from .reader import Reader
-from .writer import Writer, ESWriter, HiveWriter
+from .writer import Writer, ElasticSearchWriter, HiveWriter, HiveWriter2, FileWriter
 from .mapping import Mapping
 
 __version__ = '2.0.1'
