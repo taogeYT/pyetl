@@ -20,15 +20,35 @@ class Index(object):
     def search(self, body=None):
         return self.es.search(index=self.name, doc_type=self.doc_type, body=body)
 
+    def get_columns(self):
+        r = self.es.indices.get_mapping(self.name, doc_type=self.doc_type)
+        columns = []
+        for index in r:
+            columns.extend(r[index]["mappings"]["properties"])
+        return set(columns)
+
     def insert_one(self, doc):
         return self.es.index(index=self.name, doc_type=self.doc_type, body=doc)
 
-    def bulk_insert(self, docs, batch_size=10000):
+    def bulk(self, docs, batch_size=10000):
         def mapping(doc):
             return {"_index": self.name, "_type": self.doc_type, "_source": doc}
         docs = (mapping(doc) for doc in docs)
         for batch in batch_dataset(docs, batch_size=batch_size):
             helpers.bulk(self.es, batch)
+
+    def parallel_bulk(self, docs, batch_size=10000, thread_count=4):
+        def mapping(doc):
+            return {"_index": self.name, "_type": self.doc_type, "_source": doc}
+        docs = (mapping(doc) for doc in docs)
+        res = helpers.parallel_bulk(self.es, actions=docs, thread_count=thread_count, chunk_size=batch_size)
+        success_count, error_count = 0, 0
+        for success, info in res:
+            if success:
+                success_count += 1
+            else:
+                error_count += 1
+        return success_count, error_count
 
     def delete_one(self, _id):
         self.es.delete(index=self.name, doc_type=self.doc_type, id=_id)
@@ -88,3 +108,12 @@ class ES(Elasticsearch):
 
     def get_alias_manager(self, name):
         return AliasManager(name, self)
+
+
+def main():
+    es = ES()
+    print(es.get_index("user*").get_columns())
+
+
+if __name__ == '__main__':
+    main()
