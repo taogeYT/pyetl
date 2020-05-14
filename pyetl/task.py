@@ -3,6 +3,7 @@
 @time: 2020/4/29 10:58 上午
 @desc:
 """
+from pyetl.utils import print_run_time
 
 
 class Task(object):
@@ -19,6 +20,7 @@ class Task(object):
         if method == "test":
             self.test()
 
+    @print_run_time
     def start(self):
         self.load(self.transform(self.extract()))
 
@@ -35,5 +37,6 @@ class Task(object):
     def transform(self, dataset):
         return self.mapping.transform(dataset)
 
+    @print_run_time
     def load(self, dataset):
         self.writer.write(dataset)
