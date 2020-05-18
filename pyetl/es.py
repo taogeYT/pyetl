@@ -62,7 +62,7 @@ class Index(object):
         self.es.delete_by_query(index=self.name, doc_type=self.doc_type, body=body)
 
     def create(self, settings):
-        return self.es.indices.create(index=self.name, doc_type=self.doc_type, body=settings)
+        return self.es.indices.create(index=self.name, body=settings)
 
     def drop(self):
         return self.es.indices.delete(index=self.name, doc_type=self.doc_type, ignore=[400, 404])

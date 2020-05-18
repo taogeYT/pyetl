@@ -45,8 +45,10 @@ class Writer(BaseWriter):
 
 class ElasticSearchWriter(BaseWriter):
 
-    def __init__(self, hosts, index_name, doc_type=None, parallel_num=1, batch_size=10000):
-        self.es = ES(hosts=hosts, timeout=60)
+    def __init__(self, hosts, index_name, doc_type=None, parallel_num=1, batch_size=10000, es_params=None):
+        if es_params is None:
+            es_params = {}
+        self.es = ES(hosts=hosts, **es_params)
         self.index_name = index_name
         self.doc_type = doc_type
         self.batch_size = batch_size
@@ -57,7 +59,7 @@ class ElasticSearchWriter(BaseWriter):
         if self.parallel_num > 1:
             self.index.parallel_bulk(docs=dataset, batch_size=self.batch_size, thread_count=self.parallel_num)
         else:
-            self.es.index.bulk(dataset, batch_size=self.batch_size)
+            self.index.bulk(dataset, batch_size=self.batch_size)
 
 
 class HiveWriter(BaseWriter):
@@ -114,7 +116,7 @@ class HiveWriter2(HiveWriter):
 
 class FileWriter(BaseWriter):
 
-    def __init__(self, file_name, batch_size=100000, header=True, sep=","):
+    def __init__(self, file_name, batch_size=BATCH_SIZE, header=True, sep=","):
         self.file_name = file_name
         self.batch_size = batch_size
         self.header = header
