@@ -5,6 +5,7 @@
 """
 from abc import ABC, abstractmethod
 
+import pandas
 from pydbclib import connect
 
 from pyetl.dataset import Dataset
@@ -49,28 +50,36 @@ class DatabaseReader(Reader):
 
 class FileReader(Reader):
 
-    def __init__(self, file_path, sep=','):
+    def __init__(self, file_path, pd_params=None):
         self.file_path = file_path
-        self.sep = sep
+        if pd_params is None:
+            pd_params = {}
+        pd_params.setdefault("chunksize", 10000)
+        self.file = pandas.read_csv(self.file_path, **pd_params)
+        self.df = self.file.read(0)
+
+    def _get_records(self, columns):
+        for df in self.file:
+            df = df.where(df.notnull(), None).rename(columns=columns)
+            for record in df.to_dict("records"):
+                yield record
 
     def read(self, columns):
-        def get_record(reader):
-            for df in reader:
-                df = df.rename(columns=columns)
-                for record in df.to_dict("records"):
-                    yield record
-        import pandas
-        file_reader = pandas.read_csv(self.file_path, sep=self.sep, chunksize=10000)
-        return Dataset(get_record(file_reader))
+        return Dataset(self._get_records(columns))
 
 
 class ExcelReader(Reader):
 
-    def __init__(self, file_path, sheet_name=0):
-        self.file_path = file_path
+    def __init__(self, file, sheet_name=0, pd_params=None):
         self.sheet_name = sheet_name
+        if isinstance(file, str):
+            self.file = pandas.ExcelFile(self.file)
+        elif isinstance(file, pandas.ExcelFile):
+            self.file = file
+        if pd_params is None:
+            pd_params = {}
+        self.df = self.file.parse(self.sheet_name, **pd_params)
 
     def read(self, columns):
-        import pandas
-        df = pandas.read_excel(self.file_path, sheet_name=self.sheet_name).rename(columns=columns)
+        df = self.df.where(self.df.notnull(), None).rename(columns=columns)
         return Dataset(df.to_dict("records"))
