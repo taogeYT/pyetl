@@ -11,76 +11,82 @@ from pydbclib import connect
 from pydbclib.utils import get_columns
 
 from pyetl.es import ES
-BATCH_SIZE = 100000
+from pyetl.utils import Singleton
 
 
-class BaseWriter(ABC):
-
-    def write(self, dataset):
-        self.before()
-        self.execute(dataset)
-        self.after()
-
-    def before(self):
-        pass
-
-    def after(self):
-        pass
+class Writer(ABC):
+    default_batch_size = 100000
 
     @abstractmethod
-    def execute(self, dataset):
+    def write(self, dataset):
         pass
 
 
-class Writer(BaseWriter):
+class DatabaseWriter(Writer):
 
-    def __init__(self, uri, table_name, batch_size=BATCH_SIZE):
+    def __init__(self, uri, table_name, batch_size=None):
         self.db = connect(uri)
         self.table_name = table_name
-        self.batch_size = batch_size
+        self.batch_size = batch_size or self.default_batch_size
 
-    def execute(self, dataset):
+    def write(self, dataset):
         self.db.get_table(self.table_name).bulk(dataset, batch_size=self.batch_size)
 
 
-class ElasticSearchWriter(BaseWriter):
+class ElasticSearchWriter(Writer):
 
-    def __init__(self, hosts, index_name, doc_type=None, parallel_num=1, batch_size=10000, es_params=None):
+    def __init__(self, hosts, index_name, doc_type=None, parallel_num=4, batch_size=10000, es_params=None):
+        class SingletonES(ES, metaclass=Singleton):
+            def __init__(self):
+                super().__init__(hosts=hosts, **es_params)
+        self.es_singleton_class = SingletonES
         if es_params is None:
             es_params = {}
-        self.es = ES(hosts=hosts, **es_params)
+        self._client = None
+        self._index = None
         self.index_name = index_name
         self.doc_type = doc_type
-        self.batch_size = batch_size
+        self.batch_size = batch_size or self.default_batch_size
         self.parallel_num = parallel_num
-        self.index = self.es.get_index(index_name, doc_type)
 
-    def execute(self, dataset):
-        if self.parallel_num > 1:
-            self.index.parallel_bulk(docs=dataset, batch_size=self.batch_size, thread_count=self.parallel_num)
-        else:
-            self.index.bulk(dataset, batch_size=self.batch_size)
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = self.es_singleton_class()
+        return self._client
+
+    @property
+    def index(self):
+        if self._index is None:
+            self._index = self.client.get_index(self.index_name, self.doc_type)
+        return self._index
+
+    def write(self, dataset):
+        self.index.parallel_bulk(docs=dataset, batch_size=self.batch_size, thread_count=self.parallel_num)
 
 
-class HiveWriter(BaseWriter):
+class HiveWriter(Writer):
     """
     insert dataset to hive table by 'insert into' sql
     """
 
-    def __init__(self, uri, table_name, batch_size=BATCH_SIZE):
+    def __init__(self, uri, table_name, batch_size=None):
         self.db = connect(uri)
         self.table_name = table_name
-        self.batch_size = batch_size
-        self.columns = self._get_table_columns()
+        self.batch_size = batch_size or self.default_batch_size
+        self._columns = None
 
-    def _get_table_columns(self):
-        self.db.execute(f"select * from {self.table_name} limit 0")
-        return get_columns(self.db.driver.description())
+    @property
+    def columns(self):
+        if self.columns is None:
+            self.db.write(f"select * from {self.table_name} limit 0")
+            self._columns = get_columns(self.db.driver.description())
+        return self._columns
 
     def complete_all_fields(self, record):
         return {k: record.get(k, "") for k in self.columns}
 
-    def execute(self, dataset):
+    def write(self, dataset):
         self.db.get_table(self.table_name).bulk(dataset.map(self.complete_all_fields), batch_size=self.batch_size)
 
 
@@ -89,7 +95,7 @@ class HiveWriter2(HiveWriter):
     insert dataset to hive table by 'load data' sql
     """
 
-    def __init__(self, uri, table_name, batch_size=BATCH_SIZE):
+    def __init__(self, uri, table_name, batch_size=None):
         super().__init__(uri, table_name, batch_size)
         self.local_file_name = self._get_local_file_name()
 
@@ -98,29 +104,29 @@ class HiveWriter2(HiveWriter):
         code = random.randint(1000, 9999)
         return f"pyetl_dst_table_{'_'.join(self.table_name.split())}_{code}"
 
-    def execute(self, dataset):
+    def write(self, dataset):
         self.to_csv(dataset)
         self.load_data()
 
     def to_csv(self, dataset):
         # dataset.to_df().to_csv(tmp_file, index=None, header=False, sep="\001", columns=self.columns)
         dataset.map(self.complete_all_fields).to_csv(
-            self.local_file_name, header=False, sep=",", columns=self.columns, batch_size=self.batch_size)
+            self.local_file_name, header=False, sep="\001", columns=self.columns, batch_size=self.batch_size)
 
     def load_data(self):
         if os.system(f"hadoop fs -put {self.local_file_name} /tmp/{self.local_file_name}") == 0:
-            self.db.execute(f"load data inpath '/tmp/{self.local_file_name}' into table {self.table_name}")
+            self.db.write(f"load data inpath '/tmp/{self.local_file_name}' into table {self.table_name}")
         else:
             print("上传HDFS失败:", self.local_file_name)
 
 
-class FileWriter(BaseWriter):
+class FileWriter(Writer):
 
-    def __init__(self, file_name, batch_size=BATCH_SIZE, header=True, sep=","):
-        self.file_name = file_name
-        self.batch_size = batch_size
+    def __init__(self, file_path, batch_size=None, header=True, sep=","):
+        self.file_path = file_path
+        self.batch_size = batch_size or self.default_batch_size
         self.header = header
         self.sep = sep
 
-    def execute(self, dataset):
-        dataset.to_csv(self.file_name, header=self.header, sep=self.sep, batch_size=self.batch_size)
+    def write(self, dataset):
+        dataset.to_csv(self.file_path, header=self.header, sep=self.sep, batch_size=self.batch_size)
