@@ -54,7 +54,7 @@ class NewTask(Task):
       
     def apply_function(self, record):
         """数据流中对一个整条数据执行map函数"""
-        record["flag"] = 1 if int(record["id"]) % 2 else 0
+        record["flag"] = int(record["id"]) % 2
         return record
 
     def before(self):
