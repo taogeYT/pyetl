@@ -4,7 +4,7 @@ Pyetl is a **Python 3.6+** ETL framework
 
 ## Installation:
 ```shell script
-pip install pyetl
+pip3 install pyetl
 ```
 
 ## Usage:
