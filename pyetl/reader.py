@@ -70,16 +70,38 @@ class FileReader(Reader):
 
 class ExcelReader(Reader):
 
-    def __init__(self, file, sheet_name=0, pd_params=None):
+    def __init__(self, file, sheet_name=0, pd_params=None, detect_table_border=True):
         self.sheet_name = sheet_name
         if isinstance(file, str):
-            self.file = pandas.ExcelFile(self.file)
+            self.file = pandas.ExcelFile(file)
         elif isinstance(file, pandas.ExcelFile):
             self.file = file
+        else:
+            raise ValueError(f"无效的参数 file={type(file)}")
         if pd_params is None:
             pd_params = {}
+        pd_params.setdefault("dtype", 'object')
         self.df = self.file.parse(self.sheet_name, **pd_params)
+        if detect_table_border:
+            self.detect_table_border()
 
     def read(self, columns):
         df = self.df.where(self.df.notnull(), None).rename(columns=columns)
         return Dataset(df.to_dict("records"))
+
+    def detect_table_border(self):
+        y, x = self.df.shape
+        axis_x = self.df.count()
+        for i in range(axis_x.size):
+            name = axis_x.index[i]
+            count = axis_x[i]
+            if isinstance(name, str) and name.startswith("Unnamed:") and count == 0:
+                x = i
+                break
+        axis_y = self.df.count(axis=1)
+        for i in range(axis_y.size):
+            count = axis_y[i]
+            if count == 0:
+                y = i
+                break
+        self.df = self.df.iloc[:y, :x]
