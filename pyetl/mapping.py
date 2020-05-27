@@ -14,18 +14,18 @@ class ColumnsMapping(object):
     def get_src_columns_alias(self):
         alias = {}
         for k, v in self.raw_columns.items():
-            if isinstance(v, str):
-                alias.setdefault(v, k)
-            else:
+            if isinstance(v, (list, tuple)):
                 for i, name in enumerate(v):
                     alias.setdefault(name, "%s_%s" % (k, i))
+            else:
+                alias.setdefault(v, k)
 
         columns = {}
         for k, v in self.raw_columns.items():
-            if isinstance(v, str):
-                columns[k] = alias[v]
-            else:
+            if isinstance(v, (list, tuple)):
                 columns[k] = (alias[n] for n in v)
+            else:
+                columns[k] = alias[v]
         return alias, columns
 
 
@@ -38,9 +38,9 @@ class Mapping(object):
     def __call__(self, record):
         result = {}
         for k, v in self.columns.items():
-            if isinstance(v, str):
+            if isinstance(v, (list, tuple)):
+                result[k] = self.functions.get(k, lambda x: ",".join(map(str, x)))(tuple(record[n] for n in v))
+            else:
                 value = record[v]
                 result[k] = self.functions[k](value) if k in self.functions else value
-            else:
-                result[k] = self.functions.get(k, lambda x: ",".join(map(str, x)))(tuple(record[n] for n in v))
         return result
