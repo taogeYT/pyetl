@@ -64,3 +64,6 @@ class Job(object):
         mapping = Mapping(self.columns_mapping.columns, self.functions)
         self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function).write(self.writer)
         self.after()
+
+
+Task = Job
