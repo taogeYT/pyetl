@@ -83,7 +83,7 @@ NewTask().start()
 | DatabaseWriter      | 支持所有关系型数据库的写入 |
 | ElasticSearchWriter | 批量写入数据到es索引       |
 | HiveWriter          | 批量插入hive表             |
-| HiveWriter2         | Load data方式写入hive表    |
+| HiveWriter2         | Load data方式导入hive表（推荐) |
 | FileWriter          | 写入数据到文本文件         |
 
  
