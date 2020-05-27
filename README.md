@@ -15,7 +15,7 @@ from pyetl import Task, DatabaseReader, DatabaseWriter
 db = connect("mysql://user:password@localhost:3306/test") # 数据库连接基于pydbclib包
 reader = DatabaseReader(db, table_name="source_table") # 从source_table表获取数据流
 writer = DatabaseWriter(db, table_name="destination_table") # 数据流写入destination_table表
-task = Task(reader, writer, columns={"id", "name"}, functions={"id": str}) # 字段map函数id字段类型转换为字符串
+task = Task(reader, writer, columns={"id", "name"}, functions={"id": str}) # 字段的map函数，将id字段类型转换为字符串
 task.start()
 ```
 
@@ -58,6 +58,7 @@ class NewTask(Task):
         return record
 
     def before(self):
+        """任务开始前要执行的操作"""
         sql = "create table destination_table(id int, name varchar(100))"
         self.writer.db.execute(sql)
     
