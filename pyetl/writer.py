@@ -7,8 +7,7 @@ import os
 import random
 from abc import ABC, abstractmethod
 
-from pydbclib import connect
-from pydbclib.utils import get_columns
+from pydbclib import connect, Database
 
 from pyetl.es import ES
 from pyetl.utils import Singleton
@@ -24,8 +23,15 @@ class Writer(ABC):
 
 class DatabaseWriter(Writer):
 
-    def __init__(self, uri, table_name, batch_size=None):
-        self.db = connect(uri)
+    def __init__(self, db, table_name, batch_size=None):
+        if isinstance(db, Database):
+            self.db = db
+        elif isinstance(db, dict):
+            self.db = connect(**db)
+        elif isinstance(db, str):
+            self.db = connect(db)
+        else:
+            raise ValueError("db 参数类型错误")
         self.table_name = table_name
         self.batch_size = batch_size or self.default_batch_size
 
@@ -70,8 +76,15 @@ class HiveWriter(Writer):
     insert dataset to hive table by 'insert into' sql
     """
 
-    def __init__(self, uri, table_name, batch_size=None):
-        self.db = connect(uri)
+    def __init__(self, db, table_name, batch_size=None):
+        if isinstance(db, Database):
+            self.db = db
+        elif isinstance(db, dict):
+            self.db = connect(**db)
+        elif isinstance(db, str):
+            self.db = connect(db)
+        else:
+            raise ValueError("db 参数类型错误")
         self.table_name = table_name
         self.batch_size = batch_size or self.default_batch_size
         self._columns = None
@@ -79,8 +92,8 @@ class HiveWriter(Writer):
     @property
     def columns(self):
         if self.columns is None:
-            self.db.write(f"select * from {self.table_name} limit 0")
-            self._columns = get_columns(self.db.driver.description())
+            self.db.execute(f"select * from {self.table_name} limit 0")
+            self._columns = self.db.get_columns()
         return self._columns
 
     def complete_all_fields(self, record):
@@ -95,8 +108,8 @@ class HiveWriter2(HiveWriter):
     insert dataset to hive table by 'load data' sql
     """
 
-    def __init__(self, uri, table_name, batch_size=None):
-        super().__init__(uri, table_name, batch_size)
+    def __init__(self, db, table_name, batch_size=None):
+        super().__init__(db, table_name, batch_size)
         self.local_file_name = self._get_local_file_name()
 
     def _get_local_file_name(self):

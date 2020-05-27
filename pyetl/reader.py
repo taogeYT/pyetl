@@ -6,22 +6,35 @@
 from abc import ABC, abstractmethod
 
 import pandas
-from pydbclib import connect
+from pydbclib import connect, Database
 
 from pyetl.dataset import Dataset
 
 
 class Reader(ABC):
+    _columns = None
 
     @abstractmethod
     def read(self, columns):
         pass
 
+    @property
+    @abstractmethod
+    def columns(self):
+        return self._columns
+
 
 class DatabaseReader(Reader):
 
-    def __init__(self, uri, table_name, condition=None, limit=None):
-        self.db = connect(uri)
+    def __init__(self, db, table_name, condition=None, limit=None):
+        if isinstance(db, Database):
+            self.db = db
+        elif isinstance(db, dict):
+            self.db = connect(**db)
+        elif isinstance(db, str):
+            self.db = connect(db)
+        else:
+            raise ValueError("db 参数类型错误")
         self.table_name = table_name
         self.condition = condition if condition else "1=1"
         self.limit = limit
@@ -41,11 +54,17 @@ class DatabaseReader(Reader):
         elif callable(self.condition):
             dataset = self._read_dataset(text).filter(self.condition)
         else:
-            raise ValueError("condition 参数错误")
+            raise ValueError("condition 参数类型错误")
         if isinstance(self.limit, int):
             return dataset.limit(self.limit)
         else:
             return dataset
+
+    @property
+    def columns(self):
+        if self._columns is None:
+            self._columns = self.db.get_table(self.table_name).get_columns()
+        return self._columns
 
 
 class FileReader(Reader):
@@ -56,7 +75,6 @@ class FileReader(Reader):
             pd_params = {}
         pd_params.setdefault("chunksize", 10000)
         self.file = pandas.read_csv(self.file_path, **pd_params)
-        self.df = self.file.read(0)
 
     def _get_records(self, columns):
         for df in self.file:
@@ -66,6 +84,12 @@ class FileReader(Reader):
 
     def read(self, columns):
         return Dataset(self._get_records(columns))
+
+    @property
+    def columns(self):
+        if self._columns is None:
+            self._columns = [col for col in self.file.read(0).columns]
+        return self._columns
 
 
 class ExcelReader(Reader):
@@ -77,7 +101,7 @@ class ExcelReader(Reader):
         elif isinstance(file, pandas.ExcelFile):
             self.file = file
         else:
-            raise ValueError(f"无效的参数 file={type(file)}")
+            raise ValueError(f"file 参数类型错误")
         if pd_params is None:
             pd_params = {}
         pd_params.setdefault("dtype", 'object')
@@ -88,6 +112,12 @@ class ExcelReader(Reader):
     def read(self, columns):
         df = self.df.where(self.df.notnull(), None).rename(columns=columns)
         return Dataset(df.to_dict("records"))
+
+    @property
+    def columns(self):
+        if self._columns is None:
+            self._columns = [col for col in self.df.columns]
+        return self._columns
 
     def detect_table_border(self):
         y, x = self.df.shape
