@@ -14,7 +14,7 @@ from pydbclib import connect
 from pyetl import Task, DatabaseReader, DatabaseWriter
 db = connect("mysql://user:password@localhost:3306/test") # 数据库连接基于pydbclib包
 reader = DatabaseReader(db, table_name="source_table") # 从source_table表获取数据流
-writer = DatabaseWriter(db, table_name="destination_table") # 数据流写入destination_table表
+writer = DatabaseWriter(db, table_name="target_table") # 数据流写入target_table表
 task = Task(reader, writer, columns={"id", "name"}, functions={"id": str}) # 字段的map函数，将id字段类型转换为字符串
 task.start()
 ```
@@ -27,8 +27,8 @@ from pyetl import Task, DatabaseReader, DatabaseWriter
 db = connect("mysql://user:password@localhost:3306/test")
 # 原始表source_table包含uuid，full_name字段
 reader = DatabaseReader(db, table_name="source_table")
-# 目标表destination_table包含id，name字段
-writer = DatabaseWriter(db, table_name="destination_table")
+# 目标表target_table包含id，name字段
+writer = DatabaseWriter(db, table_name="target_table")
 # 配置目标表和原始表的字段映射
 columns={"id": "uuid", "name": "full_name"}
 task = Task(reader, writer, columns=columns, functions={"id": str}) # functions绑定的是目标表的字段名称
@@ -44,7 +44,7 @@ from pyetl import Task, DatabaseReader, DatabaseWriter
 db = connect("mysql://user:password@localhost:3306/test")
 class NewTask(Task):
     reader = DatabaseReader(db, table_name="source_table")
-    writer = DatabaseWriter(db, table_name="destination_table")
+    writer = DatabaseWriter(db, table_name="target_table")
     
     def get_columns(self):
         """通过函数的方式生成字段映射配置，使用更灵活"""
