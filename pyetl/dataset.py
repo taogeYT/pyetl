@@ -5,6 +5,8 @@
 """
 import itertools
 
+import pandas
+
 
 class Dataset(object):
 
@@ -61,13 +63,11 @@ class Dataset(object):
 
     def to_df(self, batch_size=None):
         if batch_size is None:
-            import pandas
             return pandas.DataFrame.from_records(self)
         else:
             return self._to_df_iterator(batch_size)
 
     def _to_df_iterator(self, batch_size):
-        import pandas
         while 1:
             records = self.get(batch_size)
             if records:
