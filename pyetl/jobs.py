@@ -12,6 +12,7 @@ class Job(object):
     writer = None
     columns = None
     functions = None
+    _dataset = None
 
     def __init__(self, reader=None, writer=None, columns=None, functions=None):
         if reader is not None:
@@ -54,18 +55,24 @@ class Job(object):
         pass
 
     def show(self, num=10):
-        self.read_and_mapping().show(num)
+        self.dataset.show(num)
 
     def read_and_mapping(self):
-        mapping = Mapping(self.columns_mapping.columns, self.functions)
-        return self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function)
+        return self.dataset
+
+    @property
+    def dataset(self):
+        if self._dataset is None:
+            mapping = Mapping(self.columns_mapping.columns, self.functions)
+            self._dataset = self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function)
+        return self._dataset
 
     @print_run_time
     def start(self):
         if not getattr(self, "writer", None):
             raise ValueError("%s must have a writer" % type(self).__name__)
         self.before()
-        self.read_and_mapping().write(self.writer)
+        self.dataset.write(self.writer)
         self.after()
 
 
