@@ -33,6 +33,7 @@ class DatabaseWriter(Writer):
         else:
             raise ValueError("db 参数类型错误")
         self.table_name = table_name
+        self.table = self.db.get_table(self.table_name)
         self.batch_size = batch_size or self.default_batch_size
 
     def write(self, dataset):

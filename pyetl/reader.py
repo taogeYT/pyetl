@@ -36,6 +36,7 @@ class DatabaseReader(Reader):
         else:
             raise ValueError("db 参数类型错误")
         self.table_name = table_name
+        self.table = self.db.get_table(self.table_name)
         self.condition = condition if condition else "1=1"
         self.limit = limit
 
