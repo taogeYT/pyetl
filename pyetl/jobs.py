@@ -4,7 +4,7 @@
 @desc:
 """
 from pyetl.mapping import ColumnsMapping, Mapping
-from pyetl.utils import print_run_time
+from pyetl.utils import print_run_time, validate_param
 
 
 class Job(object):
@@ -20,17 +20,17 @@ class Job(object):
             self.writer = writer
         if not getattr(self, 'reader', None):
             raise ValueError("%s must have a reader" % type(self).__name__)
-        if not getattr(self, "writer", None):
-            raise ValueError("%s must have a writer" % type(self).__name__)
         if columns is not None:
             self.columns = columns
         if functions is not None:
-            self.functions = functions
+            self.functions = validate_param("functions", functions, dict)
         self.columns = self.get_columns()
         self.functions = self.get_functions()
         self.columns_mapping = ColumnsMapping(self.columns)
 
     def get_columns(self):
+        if self.columns is None:
+            return {col: col for col in self.reader.columns}
         if isinstance(self.columns, dict):
             return {i: j for i, j in self.columns.items()}
         elif isinstance(self.columns, set):
@@ -45,7 +45,6 @@ class Job(object):
             return {}
 
     def apply_function(self, record):
-        # print(record)
         return record
 
     def before(self):
@@ -54,15 +53,19 @@ class Job(object):
     def after(self):
         pass
 
-    def head(self, num=10):
+    def show(self, num=10):
+        self.read_and_mapping().show(num)
+
+    def read_and_mapping(self):
         mapping = Mapping(self.columns_mapping.columns, self.functions)
-        self.reader.read(self.columns_mapping.alias).map(mapping).show(num)
+        return self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function)
 
     @print_run_time
     def start(self):
+        if not getattr(self, "writer", None):
+            raise ValueError("%s must have a writer" % type(self).__name__)
         self.before()
-        mapping = Mapping(self.columns_mapping.columns, self.functions)
-        self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function).write(self.writer)
+        self.read_and_mapping().write(self.writer)
         self.after()
 
 

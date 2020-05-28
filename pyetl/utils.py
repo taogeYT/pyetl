@@ -19,6 +19,13 @@ class Singleton(type):
         return cls.__instance
 
 
+def validate_param(name, value, type_or_types):
+    if isinstance(value, type_or_types):
+        return value
+    else:
+        raise ValueError(f"{name} 参数错误")
+
+
 def lower_columns(x):
     if isinstance(x, (list, tuple)):
         return tuple([i.lower() for i in x])
