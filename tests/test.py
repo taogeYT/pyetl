@@ -18,7 +18,7 @@ class BaseTest(unittest.TestCase):
     db = None
     src_record = {"uuid": 1, "full_name": "python ETL framework"}
     dst_record = {"id": 1, "name": "python ETL framework"}
-    columns = {"uuid": "id", "full_name": "name"}
+    columns = {"id": "uuid", "name": "full_name"}
 
     @classmethod
     def get_file_path(cls, name):
@@ -26,22 +26,33 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        path = cls.get_file_path("src.db")
-        path = "sqlite:///" + path
-        cls.db = connect(path)
+        # path = cls.get_file_path("src.db")
+        # path = "sqlite:///" + path
+        cls.db = connect("sqlite:///:memory:")
+        create_src = """CREATE TABLE "src" ("uuid" INTEGER NOT NULL,"full_name" TEXT,PRIMARY KEY ("uuid"))"""
+        cls.db.execute(create_src)
+        create_dst = """CREATE TABLE "dst" ("id" INTEGER NOT NULL,"name" TEXT,PRIMARY KEY ("id"))"""
+        cls.db.execute(create_dst)
+        cls.db.get_table("src").insert(cls.src_record)
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.db.close()
+        cls.db.execute("drop table src")
+        cls.db.execute("drop table dst")
+        cls.db.commit()
+
+    @classmethod
+    def get_dataset(cls, record):
+        return Dataset(iter([record]))
 
 
 class TestReader(BaseTest):
 
     def validate(self, reader):
         self.assertEqual(reader.columns, ["uuid", "full_name"])
-        r = reader.read(columns=self.columns)
+        r = reader.read(columns={"uuid": "id", "full_name": "name"})
         self.assertTrue(isinstance(r, Dataset))
-        self.assertEqual(r.get_all(), [self.dst_record])
+        self.assertEqual(r.get_all(), self.get_dataset(self.dst_record).get_all())
 
     def test_db_reader(self):
         reader = DatabaseReader(self.db, "src")
@@ -58,10 +69,38 @@ class TestReader(BaseTest):
 
 class TestWriter(BaseTest):
 
-    def test_db_reader(self):
+    def test_db_writer(self):
         writer = DatabaseWriter(self.db, "dst")
         writer.table.delete("1=1")
-        ds = Dataset(iter([self.dst_record]))
-        ds.write(writer)
-        r = Task(DatabaseReader(self.db, "dst")).read_and_mapping()
-        self.assertEqual(r.get_all(), [self.dst_record])
+        writer.write(self.get_dataset(self.dst_record))
+        task = Task(DatabaseReader(self.db, "dst"))
+        self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
+
+    def test_file_writer(self):
+        file = self.get_file_path("dst.txt")
+        writer = FileWriter(file)
+        writer.write(self.get_dataset(self.dst_record))
+        task = Task(FileReader(file))
+        self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
+
+
+class TestTask(BaseTest):
+
+    def test_no_columns(self):
+        reader = DatabaseReader(self.db, "src")
+        task = Task(reader)
+        self.assertEqual(task.dataset.get_all(), [self.src_record])
+
+    def test_set_columns(self):
+        reader = DatabaseReader(self.db, "src")
+        task = Task(reader, columns={"uuid"})
+        self.assertEqual(task.dataset.get_all(), [{"uuid": 1}])
+
+    def test_dict_columns(self):
+        reader = DatabaseReader(self.db, "src")
+        task = Task(reader, columns=self.columns)
+        self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
+
+
+if __name__ == '__main__':
+    unittest.main()
