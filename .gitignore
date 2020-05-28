@@ -15,6 +15,7 @@ var/
 logs/
 venv/
 tmp/
+logs/
 *.egg-info/
 .installed.cfg
 *.egg
