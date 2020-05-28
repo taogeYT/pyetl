@@ -1,2 +1,2 @@
-uuid,full_name
+id,name
 1,python ETL framework
