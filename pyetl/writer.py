@@ -92,7 +92,7 @@ class HiveWriter(Writer):
 
     @property
     def columns(self):
-        if self.columns is None:
+        if self._columns is None:
             self.db.execute(f"select * from {self.table_name} limit 0")
             self._columns = self.db.get_columns()
         return self._columns
