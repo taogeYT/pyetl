@@ -10,41 +10,46 @@ pip3 install pyetl
 ## Example
 
 ```python
-from pydbclib import connect
-from pyetl import Task, DatabaseReader, DatabaseWriter
-db = connect("mysql://user:password@localhost:3306/test") # 数据库连接基于pydbclib包
-reader = DatabaseReader(db, table_name="source_table") # 从source_table表获取数据流
-writer = DatabaseWriter(db, table_name="target_table") # 数据流写入target_table表
-task = Task(reader, writer, columns={"id", "name"}, functions={"id": str}) # 字段的map函数，将id字段类型转换为字符串
-task.start()
+from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticSearchWriter, HiveWriter2
+db_reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
+db_writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
+hive_writer = HiveWriter2("hive://localhost:10000/default", table_name="target_table")
+es_writer = ElasticSearchWriter(hosts=["localhost"], index_name="tartget_index")
+
+# 数据库之间数据同步，表到表传输
+Task(db_reader, db_writer).start()
+# 数据库到hive表同步
+Task(db_reader, hive_writer).start()
+# 数据库表同步es
+Task(db_reader, es_writer).start()
 ```
 
 #### 原始表目标表字段名称不同
 
 ```python
-from pydbclib import connect
-from pyetl import Task, DatabaseReader, DatabaseWriter
-db = connect("mysql://user:password@localhost:3306/test")
 # 原始表source_table包含uuid，full_name字段
-reader = DatabaseReader(db, table_name="source_table")
+reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
 # 目标表target_table包含id，name字段
-writer = DatabaseWriter(db, table_name="target_table")
-# 配置目标表和原始表的字段映射
-columns={"id": "uuid", "name": "full_name"}
-task = Task(reader, writer, columns=columns, functions={"id": str}) # functions绑定的是目标表的字段名称
-task.start()
+writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
+# columns配置目标表和原始表的字段映射
+columns = {"id": "uuid", "name": "full_name"}
+Task(reader, writer, columns=columns).start()
+```
+
+#### 添加字段的map函数，对字段进行校验、做标准化、数据清洗等
+```python
+# functions配置字段的map函数，如下将id字段类型转换为字符串
+Task(reader, writer, columns=columns, functions={"id": str}).start()
 ```
 
 #### 继承Task，灵活扩展
 
 ```python
 import json
-from pydbclib import connect
 from pyetl import Task, DatabaseReader, DatabaseWriter
-db = connect("mysql://user:password@localhost:3306/test")
 class NewTask(Task):
-    reader = DatabaseReader(db, table_name="source_table")
-    writer = DatabaseWriter(db, table_name="target_table")
+    reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
+    writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
     
     def get_columns(self):
         """通过函数的方式生成字段映射配置，使用更灵活"""
@@ -52,8 +57,16 @@ class NewTask(Task):
         columns = self.writer.db.read_one(sql)["columns"]
         return json.loads(columns)
       
+    def get_functions(self):
+        """函数方式返回要清洗字段的map函数"""
+        return {"id": str, "name": self.name_func}
+      
+    def name_func(self, value):
+        """name字段清洗函数，将name转换成首字母大写"""
+				return value.capitalize()
+      
     def apply_function(self, record):
-        """数据流中对一个整条数据执行map函数"""
+        """数据流中对一整条数据执行map函数"""
         record["flag"] = int(record["id"]) % 2
         return record
 
