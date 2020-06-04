@@ -7,16 +7,20 @@ import itertools
 
 import pandas
 
+from pyetl.utils import limit_iterator
+
 
 class Dataset(object):
 
     def __init__(self, rows):
         self._rows = rows
+        self.total = 0
 
     def __iter__(self):
         return self
 
     def next(self):
+        self.total += 1
         return next(self._rows)
 
     __next__ = next
@@ -41,7 +45,7 @@ class Dataset(object):
         return self.map(function)
 
     def limit(self, num):
-        self._rows = (r for i, r in enumerate(self._rows) if i < num)
+        self._rows = limit_iterator(self._rows, num)
         return self
 
     def get_one(self):

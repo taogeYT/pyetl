@@ -19,6 +19,14 @@ class Singleton(type):
         return cls.__instance
 
 
+def limit_iterator(rows, limit):
+    for i, r in enumerate(rows):
+        if i < limit:
+            yield r
+        else:
+            return None
+
+
 def validate_param(name, value, type_or_types):
     if isinstance(value, type_or_types):
         return value
