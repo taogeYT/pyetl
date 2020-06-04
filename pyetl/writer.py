@@ -5,12 +5,14 @@
 """
 import os
 import random
+import sys
 from abc import ABC, abstractmethod
+from multiprocessing.pool import Pool
 
 from pydbclib import connect, Database
 
-from pyetl.es import ES
-from pyetl.utils import Singleton
+from pyetl.es import ES, bulk_insert
+from pyetl.utils import batch_dataset
 
 
 class Writer(ABC):
@@ -40,15 +42,12 @@ class DatabaseWriter(Writer):
         self.db.get_table(self.table_name).bulk(dataset, batch_size=self.batch_size)
 
 
-class ElasticSearchWriter(Writer):
+class ElasticsearchWriter(Writer):
 
-    def __init__(self, hosts, index_name, doc_type=None, parallel_num=4, batch_size=10000, es_params=None):
-        class SingletonES(ES, metaclass=Singleton):
-            def __init__(self):
-                super().__init__(hosts=hosts, **es_params)
-        self.es_singleton_class = SingletonES
+    def __init__(self, index_name, doc_type=None, es_params=None, parallel_num=None, batch_size=10000):
         if es_params is None:
             es_params = {}
+        self.es_params = es_params
         self._client = None
         self._index = None
         self.index_name = index_name
@@ -59,7 +58,7 @@ class ElasticSearchWriter(Writer):
     @property
     def client(self):
         if self._client is None:
-            self._client = self.es_singleton_class()
+            self._client = ES(**self.es_params)
         return self._client
 
     @property
@@ -69,7 +68,14 @@ class ElasticSearchWriter(Writer):
         return self._index
 
     def write(self, dataset):
-        self.index.parallel_bulk(docs=dataset, batch_size=self.batch_size, thread_count=self.parallel_num)
+        if self.parallel_num is None or "win" in sys.platform:
+            self.index.parallel_bulk(docs=dataset, batch_size=self.batch_size)
+        else:
+            pool = Pool(self.parallel_num)
+            for batch in batch_dataset(dataset, self.batch_size):
+                pool.apply_async(bulk_insert, args=(self.es_params, batch, self.index.name, self.index.doc_type))
+            pool.close()
+            pool.join()
 
 
 class HiveWriter(Writer):
