@@ -69,6 +69,14 @@ class Dataset(object):
     def get_all(self):
         return [r for r in self._rows]
 
+    def to_batch(self, size=10000):
+        while 1:
+            batch = self.get(size)
+            if batch:
+                yield batch
+            else:
+                return None
+
     def show(self, num=10):
         for data in self.limit(num):
             print(data)
