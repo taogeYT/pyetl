@@ -7,7 +7,7 @@ from pyetl.mapping import ColumnsMapping, Mapping
 from pyetl.utils import print_run_time, validate_param
 
 
-class Job(object):
+class Task(object):
     reader = None
     writer = None
     columns = None
@@ -28,6 +28,7 @@ class Job(object):
         self.columns = self.get_columns()
         self.functions = self.get_functions()
         self.columns_mapping = ColumnsMapping(self.columns)
+        self.mapping = Mapping(self.columns_mapping.columns, self.functions, self.apply_function)
 
     def get_columns(self):
         if self.columns is None:
@@ -57,14 +58,14 @@ class Job(object):
     def show(self, num=10):
         self.dataset.show(num)
 
-    def read_and_mapping(self):
-        return self.dataset
+    @property
+    def total(self):
+        return self.mapping.total
 
     @property
     def dataset(self):
         if self._dataset is None:
-            mapping = Mapping(self.columns_mapping.columns, self.functions)
-            self._dataset = self.reader.read(self.columns_mapping.alias).map(mapping).map(self.apply_function)
+            self._dataset = self.reader.read(self.columns_mapping.alias).map(self.mapping)
         return self._dataset
 
     @print_run_time
@@ -75,5 +76,3 @@ class Job(object):
         self.dataset.write(self.writer)
         self.after()
 
-
-Task = Job
