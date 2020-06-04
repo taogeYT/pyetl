@@ -7,7 +7,26 @@ import json
 
 from elasticsearch import Elasticsearch, helpers
 
-from pyetl.utils import batch_dataset
+from pyetl.utils import batch_dataset, Singleton
+
+
+class SingletonES(Elasticsearch, metaclass=Singleton):
+    pass
+
+
+def bulk_insert(es_params, docs, index_name, doc_type, batch_size=10000):
+    def mapping(doc):
+        return {"_index": index_name, "_type": doc_type, "_source": doc}
+
+    docs = (mapping(doc) for doc in docs)
+    res = helpers.parallel_bulk(SingletonES(**es_params), actions=docs, thread_count=2, chunk_size=batch_size)
+    success_count, error_count = 0, 0
+    for success, info in res:
+        if success:
+            success_count += 1
+        else:
+            error_count += 1
+    return success_count, error_count
 
 
 class Index(object):
@@ -16,6 +35,9 @@ class Index(object):
         self.name = name
         self.doc_type = doc_type
         self.es = con
+
+    def scan(self):
+        return helpers.scan(self.es, index=self.name, doc_type=self.doc_type)
 
     def search(self, body=None):
         return self.es.search(index=self.name, doc_type=self.doc_type, body=body)

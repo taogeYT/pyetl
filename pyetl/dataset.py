@@ -33,15 +33,26 @@ class Dataset(object):
         self._rows = (r for r in self._rows if function(r))
         return self
 
-    def rename(self, mapper):
+    def rename(self, columns):
         """
         字段重命名
         """
         def function(record):
             if isinstance(record, dict):
-                return {mapper.get(k, k): v for k, v in record.items()}
+                return {columns.get(k, k): v for k, v in record.items()}
             else:
-                return dict(zip(mapper, record))
+                raise ValueError("only rename dict record")
+        return self.map(function)
+
+    def rename_and_extract(self, columns):
+        """
+        字段重命名
+        """
+        def function(record):
+            if isinstance(record, dict):
+                return {v: record[k] for k, v in columns.items() if k in record}
+            else:
+                raise ValueError("only rename dict record")
         return self.map(function)
 
     def limit(self, num):

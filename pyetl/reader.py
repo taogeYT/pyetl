@@ -9,6 +9,7 @@ import pandas
 from pydbclib import connect, Database
 
 from pyetl.dataset import Dataset
+from pyetl.es import ES
 
 
 class Reader(ABC):
@@ -96,17 +97,19 @@ class FileReader(Reader):
 class ExcelReader(Reader):
 
     def __init__(self, file, sheet_name=0, pd_params=None, detect_table_border=True):
-        self.sheet_name = sheet_name
-        if isinstance(file, str):
-            self.file = pandas.ExcelFile(file)
-        elif isinstance(file, pandas.ExcelFile):
-            self.file = file
-        else:
-            raise ValueError(f"file 参数类型错误")
         if pd_params is None:
             pd_params = {}
         pd_params.setdefault("dtype", 'object')
-        self.df = self.file.parse(self.sheet_name, **pd_params)
+        self.sheet_name = sheet_name
+        if isinstance(file, str):
+            file = pandas.ExcelFile(file)
+            self.df = file.parse(self.sheet_name, **pd_params)
+        elif isinstance(file, pandas.ExcelFile):
+            self.df = file.parse(self.sheet_name, **pd_params)
+        elif isinstance(file, pandas.DataFrame):
+            self.df = file
+        else:
+            raise ValueError(f"file 参数类型错误")
         if detect_table_border:
             self.detect_table_border()
 
@@ -125,14 +128,48 @@ class ExcelReader(Reader):
         axis_x = self.df.count()
         for i in range(axis_x.size):
             name = axis_x.index[i]
-            count = axis_x[i]
+            count = axis_x.iloc[i]
             if isinstance(name, str) and name.startswith("Unnamed:") and count == 0:
                 x = i
                 break
         axis_y = self.df.count(axis=1)
         for i in range(axis_y.size):
-            count = axis_y[i]
+            count = axis_y.iloc[i]
             if count == 0:
                 y = i
                 break
         self.df = self.df.iloc[:y, :x]
+
+
+class ElasticsearchReader(Reader):
+
+    def __init__(self, index_name, doc_type=None, es_params=None, batch_size=10000):
+        if es_params is None:
+            es_params = {}
+        self.es_params = es_params
+        self._client = None
+        self._index = None
+        self.index_name = index_name
+        self.doc_type = doc_type
+        self.batch_size = batch_size
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = ES(**self.es_params)
+        return self._client
+
+    @property
+    def index(self):
+        if self._index is None:
+            self._index = self.client.get_index(self.index_name, self.doc_type)
+        return self._index
+
+    def read(self, columns):
+        return Dataset(doc["_source"] for doc in self.index.scan()).rename_and_extract(columns)
+
+    @property
+    def columns(self):
+        if self._columns is None:
+            self._columns = self.index.get_columns()
+        return self._columns
