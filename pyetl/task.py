@@ -8,11 +8,11 @@ from pyetl.utils import print_run_time, validate_param
 
 
 class Task(object):
+    _dataset = None
     reader = None
     writer = None
     columns = None
     functions = None
-    _dataset = None
 
     def __init__(self, reader=None, writer=None, columns=None, functions=None):
         if reader is not None:
@@ -49,6 +49,9 @@ class Task(object):
     def apply_function(self, record):
         return record
 
+    def filter_function(self, record):
+        return True
+
     def before(self):
         pass
 
@@ -65,7 +68,7 @@ class Task(object):
     @property
     def dataset(self):
         if self._dataset is None:
-            self._dataset = self.reader.read(self.columns_mapping.alias).map(self.mapping)
+            self._dataset = self.reader.read(self.columns_mapping.alias).map(self.mapping).filter(self.filter_function)
         return self._dataset
 
     @print_run_time

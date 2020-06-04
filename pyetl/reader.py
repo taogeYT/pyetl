@@ -16,6 +16,7 @@ class Reader(ABC):
 
     @abstractmethod
     def read(self, columns):
+        """返回结果列名必须rename"""
         pass
 
     @property
