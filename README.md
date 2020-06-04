@@ -84,19 +84,20 @@ NewTask().start()
 
 ## Reader和Writer
 
-| Reader         | 介绍                          |
-| -------------- | ----------------------------- |
-| DatabaseReader | 支持所有关系型数据库的读取    |
-| FileReader     | 结构化文本数据读取，如csv文件 |
-| ExcelReader    | Excel表文件读取               |
+| Reader              | 介绍                       |
+| ------------------- | -------------------------- |
+| DatabaseReader      | 支持所有关系型数据库的读取    |
+| FileReader          | 结构化文本数据读取，如csv文件 |
+| ExcelReader         | Excel表文件读取             |
+| ElasticsearchReader | 读取es索引数据    |
 
 | Writer              | 介绍                       |
 | ------------------- | -------------------------- |
-| DatabaseWriter      | 支持所有关系型数据库的写入 |
-| ElasticSearchWriter | 批量写入数据到es索引       |
-| HiveWriter          | 批量插入hive表             |
+| DatabaseWriter      | 支持所有关系型数据库的写入    |
+| ElasticSearchWriter | 批量写入数据到es索引         |
+| HiveWriter          | 批量插入hive表              |
 | HiveWriter2         | Load data方式导入hive表（推荐) |
-| FileWriter          | 写入数据到文本文件         |
+| FileWriter          | 写入数据到文本文件           |
 
  
 
