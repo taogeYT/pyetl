@@ -123,7 +123,7 @@ class AliasManager(object):
         return self.es.indices.delete_alias(name=self.name, index="_all")
 
 
-class ES(Elasticsearch):
+class Client(Elasticsearch):
 
     def get_index(self, name, doc_type=None):
         return Index(name, self, doc_type=doc_type)
@@ -133,7 +133,7 @@ class ES(Elasticsearch):
 
 
 def main():
-    es = ES()
+    es = Client()
     print(es.get_index("user*").get_columns())
 
 

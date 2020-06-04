@@ -6,10 +6,9 @@
 from abc import ABC, abstractmethod
 
 import pandas
-from pydbclib import connect, Database
 
+from pyetl.connections import DatabaseConnection, ElasticsearchConnection
 from pyetl.dataset import Dataset
-from pyetl.es import ES
 
 
 class Reader(ABC):
@@ -25,17 +24,10 @@ class Reader(ABC):
         return self._columns
 
 
-class DatabaseReader(Reader):
+class DatabaseReader(DatabaseConnection, Reader):
 
     def __init__(self, db, table_name, condition=None, limit=None):
-        if isinstance(db, Database):
-            self.db = db
-        elif isinstance(db, dict):
-            self.db = connect(**db)
-        elif isinstance(db, str):
-            self.db = connect(db)
-        else:
-            raise ValueError("db 参数类型错误")
+        super().__init__(db)
         self.table_name = table_name
         self.table = self.db.get_table(self.table_name)
         self.condition = condition if condition else "1=1"
@@ -141,29 +133,14 @@ class ExcelReader(Reader):
         self.df = self.df.iloc[:y, :x]
 
 
-class ElasticsearchReader(Reader):
+class ElasticsearchReader(ElasticsearchConnection, Reader):
 
     def __init__(self, index_name, doc_type=None, es_params=None, batch_size=10000):
-        if es_params is None:
-            es_params = {}
-        self.es_params = es_params
-        self._client = None
-        self._index = None
+        super().__init__(es_params)
         self.index_name = index_name
         self.doc_type = doc_type
         self.batch_size = batch_size
-
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = ES(**self.es_params)
-        return self._client
-
-    @property
-    def index(self):
-        if self._index is None:
-            self._index = self.client.get_index(self.index_name, self.doc_type)
-        return self._index
+        self.index = self.client.get_index(self.index_name, self.doc_type)
 
     def read(self, columns):
         return Dataset(doc["_source"] for doc in self.index.scan()).rename_and_extract(columns)

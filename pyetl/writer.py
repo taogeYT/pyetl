@@ -9,9 +9,8 @@ import sys
 from abc import ABC, abstractmethod
 from multiprocessing.pool import Pool
 
-from pydbclib import connect, Database
-
-from pyetl.es import ES, bulk_insert
+from pyetl.connections import DatabaseConnection, ElasticsearchConnection
+from pyetl.es import bulk_insert
 from pyetl.utils import batch_dataset
 
 
@@ -23,17 +22,10 @@ class Writer(ABC):
         pass
 
 
-class DatabaseWriter(Writer):
+class DatabaseWriter(DatabaseConnection, Writer):
 
     def __init__(self, db, table_name, batch_size=None):
-        if isinstance(db, Database):
-            self.db = db
-        elif isinstance(db, dict):
-            self.db = connect(**db)
-        elif isinstance(db, str):
-            self.db = connect(db)
-        else:
-            raise ValueError("db 参数类型错误")
+        super().__init__(db)
         self.table_name = table_name
         self.table = self.db.get_table(self.table_name)
         self.batch_size = batch_size or self.default_batch_size
@@ -42,30 +34,16 @@ class DatabaseWriter(Writer):
         self.db.get_table(self.table_name).bulk(dataset, batch_size=self.batch_size)
 
 
-class ElasticsearchWriter(Writer):
+class ElasticsearchWriter(ElasticsearchConnection, Writer):
 
     def __init__(self, index_name, doc_type=None, es_params=None, parallel_num=None, batch_size=10000):
-        if es_params is None:
-            es_params = {}
-        self.es_params = es_params
-        self._client = None
+        super().__init__(es_params)
         self._index = None
         self.index_name = index_name
         self.doc_type = doc_type
         self.batch_size = batch_size or self.default_batch_size
         self.parallel_num = parallel_num
-
-    @property
-    def client(self):
-        if self._client is None:
-            self._client = ES(**self.es_params)
-        return self._client
-
-    @property
-    def index(self):
-        if self._index is None:
-            self._index = self.client.get_index(self.index_name, self.doc_type)
-        return self._index
+        self.index = self.client.get_index(self.index_name, self.doc_type)
 
     def write(self, dataset):
         if self.parallel_num is None or "win" in sys.platform:
@@ -78,20 +56,13 @@ class ElasticsearchWriter(Writer):
             pool.join()
 
 
-class HiveWriter(Writer):
+class HiveWriter(DatabaseConnection, Writer):
     """
     insert dataset to hive table by 'insert into' sql
     """
 
     def __init__(self, db, table_name, batch_size=None):
-        if isinstance(db, Database):
-            self.db = db
-        elif isinstance(db, dict):
-            self.db = connect(**db)
-        elif isinstance(db, str):
-            self.db = connect(db)
-        else:
-            raise ValueError("db 参数类型错误")
+        super().__init__(db)
         self.table_name = table_name
         self.batch_size = batch_size or self.default_batch_size
         self._columns = None
