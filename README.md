@@ -10,11 +10,11 @@ pip3 install pyetl
 ## Example
 
 ```python
-from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticSearchWriter, HiveWriter2
+from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticsearchWriter, HiveWriter2
 db_reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
 db_writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
 hive_writer = HiveWriter2("hive://localhost:10000/default", table_name="target_table")
-es_writer = ElasticSearchWriter(hosts=["localhost"], index_name="tartget_index")
+es_writer = ElasticSearchWriter(index_name="tartget_index")
 
 # 数据库之间数据同步，表到表传输
 Task(db_reader, db_writer).start()
@@ -36,10 +36,11 @@ columns = {"id": "uuid", "name": "full_name"}
 Task(reader, writer, columns=columns).start()
 ```
 
-#### 添加字段的map函数，对字段进行校验、做标准化、数据清洗等
+#### 添加字段的udf映射，对字段进行规则校验、数据标准化、数据清洗等
 ```python
-# functions配置字段的map函数，如下将id字段类型转换为字符串
-Task(reader, writer, columns=columns, functions={"id": str}).start()
+# functions配置字段的udf映射，如下id转字符串，name去除前后空格
+functions={"id": str, "name": lambda x: x.strip()}
+Task(reader, writer, columns=columns, functions=functions).start()
 ```
 
 #### 继承Task，灵活扩展
@@ -48,35 +49,33 @@ Task(reader, writer, columns=columns, functions={"id": str}).start()
 import json
 from pyetl import Task, DatabaseReader, DatabaseWriter
 class NewTask(Task):
-    reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
-    writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
+    reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source")
+    writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target")
     
     def get_columns(self):
         """通过函数的方式生成字段映射配置，使用更灵活"""
+        # 以下示例将数据库中的字段映射配置取出后转字典类型返回
         sql = "select columns from task where name='new_task'"
         columns = self.writer.db.read_one(sql)["columns"]
         return json.loads(columns)
       
     def get_functions(self):
-        """函数方式返回要清洗字段的map函数"""
-        return {"id": str, "name": self.name_func}
-      
-    def name_func(self, value):
-        """name字段清洗函数，将name转换成首字母大写"""
-				return value.capitalize()
+        """通过函数的方式生成字段的udf映射"""
+        # 以下示例将每个字段类型都转换为字符串
+        return {col: str for col in self.columns}
       
     def apply_function(self, record):
-        """数据流中对一整条数据执行map函数"""
+        """数据流中对一整条数据的udf"""
         record["flag"] = int(record["id"]) % 2
         return record
 
     def before(self):
-        """任务开始前要执行的操作"""
+        """任务开始前要执行的操作, 如初始化任务表，创建目标表等"""
         sql = "create table destination_table(id int, name varchar(100))"
         self.writer.db.execute(sql)
     
     def after(self):
-        """任务完成后要执行的操作"""
+        """任务完成后要执行的操作，如更新任务状态等"""
         sql = "update task set status='done' where name='new_task'"
         self.writer.db.execute(sql)
 
