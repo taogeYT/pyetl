@@ -31,16 +31,19 @@ class ColumnsMapping(object):
 
 class Mapping(object):
 
-    def __init__(self, columns, functions):
+    def __init__(self, columns, functions, apply_function):
         self.columns = columns
         self.functions = functions
+        self.apply_function = apply_function
+        self.total = 0
 
     def __call__(self, record):
         result = {}
         for k, v in self.columns.items():
             if isinstance(v, (list, tuple)):
-                result[k] = self.functions.get(k, lambda x: ",".join(map(str, x)))(tuple(record[n] for n in v))
+                result[k] = self.functions.get(k, lambda x: ",".join(map(str, x)))(tuple(record.get(n) for n in v))
             else:
-                value = record[v]
+                value = record.get(v)
                 result[k] = self.functions[k](value) if k in self.functions else value
-        return result
+        self.total += 1
+        return self.apply_function(result)
