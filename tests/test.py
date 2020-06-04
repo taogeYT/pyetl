@@ -9,7 +9,7 @@ import unittest
 from pydbclib import connect
 
 from pyetl.dataset import Dataset
-from pyetl.jobs import Task
+from pyetl.task import Task
 from pyetl.reader import DatabaseReader, FileReader, ExcelReader
 from pyetl.writer import DatabaseWriter, FileWriter
 
