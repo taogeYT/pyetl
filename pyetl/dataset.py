@@ -46,11 +46,11 @@ class Dataset(object):
 
     def rename_and_extract(self, columns):
         """
-        字段重命名
+        字段投影，字段不存在的默认等于None
         """
         def function(record):
             if isinstance(record, dict):
-                return {v: record[k] for k, v in columns.items() if k in record}
+                return {v: record.get(k) for k, v in columns.items()}
             else:
                 raise ValueError("only rename dict record")
         return self.map(function)
