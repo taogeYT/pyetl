@@ -14,7 +14,7 @@ from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticsearchWriter, Hiv
 db_reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
 db_writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
 hive_writer = HiveWriter2("hive://localhost:10000/default", table_name="target_table")
-es_writer = ElasticSearchWriter(index_name="tartget_index")
+es_writer = ElasticsearchWriter(index_name="tartget_index")
 
 # 数据库之间数据同步，表到表传输
 Task(db_reader, db_writer).start()
@@ -94,7 +94,7 @@ NewTask().start()
 | Writer              | 介绍                       |
 | ------------------- | -------------------------- |
 | DatabaseWriter      | 支持所有关系型数据库的写入    |
-| ElasticSearchWriter | 批量写入数据到es索引         |
+| ElasticsearchWriter | 批量写入数据到es索引         |
 | HiveWriter          | 批量插入hive表              |
 | HiveWriter2         | Load data方式导入hive表（推荐) |
 | FileWriter          | 写入数据到文本文件           |
