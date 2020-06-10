@@ -46,7 +46,11 @@ class Index(object):
         r = self.es.indices.get_mapping(self.name, doc_type=self.doc_type)
         columns = []
         for index in r:
-            columns.extend(r[index]["mappings"]["properties"])
+            mappings = r[index]["mappings"]
+            if "properties" in mappings:
+                columns.extend(mappings["properties"])
+            else:
+                columns.extend(mappings[self.doc_type]["properties"])
         return set(columns)
 
     def insert_one(self, doc):
