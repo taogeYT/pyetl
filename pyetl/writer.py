@@ -106,7 +106,7 @@ class HiveWriter2(HiveWriter):
 
     def load_data(self):
         if os.system(f"hadoop fs -put {self.local_file_name} /tmp/{self.local_file_name}") == 0:
-            self.db.write(f"load data inpath '/tmp/{self.local_file_name}' into table {self.table_name}")
+            self.db.execute(f"load data inpath '/tmp/{self.local_file_name}' into table {self.table_name}")
         else:
             print("上传HDFS失败:", self.local_file_name)
 
