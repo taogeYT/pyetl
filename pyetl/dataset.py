@@ -98,7 +98,7 @@ class Dataset(object):
             else:
                 return None
 
-    def to_csv(self, file_path, sep=',', header=False, columns=None, batch_size=100000):
+    def to_csv(self, file_path, batch_size=100000, **kwargs):
         """
         用于大数据量分批写入文件
         :param file_path: 文件路径
@@ -107,8 +107,7 @@ class Dataset(object):
         :param columns: 按给定字段排序
         :param batch_size: 每批次写入文件行数
         """
-        mode = "w"
+        kwargs.update(index=False)
         for df in self.to_df(batch_size=batch_size):
-            df.to_csv(file_path, sep=sep, index=False, header=header, columns=columns, mode=mode)
-            mode = "a"
-            header = False
+            df.to_csv(file_path, **kwargs)
+            kwargs.update(mode="a", header=False)

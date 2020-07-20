@@ -129,17 +129,22 @@ class HiveWriter2(HiveWriter):
 
 class FileWriter(Writer):
 
-    def __init__(self, file_path, batch_size=None, header=True, sep=",", columns=None):
+    def __init__(self, file_path, file_name=None, batch_size=None, header=True, sep=",", columns=None):
         self.file_path = file_path
-        os.makedirs(self.file_path)
+        self.file_name = file_name
+        if not os.path.exists(file_path):
+            os.makedirs(self.file_path)
         self.batch_size = batch_size or self.default_batch_size
         self.kw = dict(header=header, sep=sep, columns=columns)
 
     def write(self, dataset):
-        self.to_csv(dataset, self.file_path, batch_size=self.batch_size, **self.kw)
+        if self.file_name:
+            dataset.to_csv(os.path.join(self.file_path, self.file_name), batch_size=self.batch_size, **self.kw)
+        else:
+            self.to_csv_files(dataset, self.file_path, batch_size=self.batch_size, **self.kw)
 
     @classmethod
-    def to_csv(cls, dataset, path, batch_size=100000, **kwargs):
+    def to_csv_files(cls, dataset, path, batch_size=100000, **kwargs):
         for i, df in enumerate(dataset.to_df(batch_size=batch_size)):
             file = os.path.join(path, f"{i:0>8}")
             df.to_csv(file, index=False, **kwargs)

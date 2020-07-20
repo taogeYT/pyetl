@@ -78,7 +78,8 @@ class TestWriter(BaseTest):
 
     def test_file_writer(self):
         file = self.get_file_path("dst.txt")
-        writer = FileWriter(file)
+        path, name = os.path.split(file)
+        writer = FileWriter(path, name)
         writer.write(self.get_dataset(self.dst_record))
         task = Task(FileReader(file))
         self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
