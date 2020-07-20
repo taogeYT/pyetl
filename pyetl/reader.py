@@ -12,11 +12,19 @@ from pyetl.dataset import Dataset
 
 
 class Reader(ABC):
+    default_batch_size = 10000
     _columns = None
+    _limit_num = None
 
-    @abstractmethod
     def read(self, columns):
         """返回结果列名必须rename"""
+        dataset = self.get_dataset(columns)
+        if isinstance(self._limit_num, int):
+            dataset = dataset.limit(self._limit_num)
+        return dataset
+
+    @abstractmethod
+    def get_dataset(self, columns):
         pass
 
     @property
@@ -27,33 +35,31 @@ class Reader(ABC):
 
 class DatabaseReader(DatabaseConnection, Reader):
 
-    def __init__(self, db, table_name, condition=None, limit=None):
+    def __init__(self, db, table_name, condition=None, batch_size=None, limit=None):
         super().__init__(db)
         self.table_name = table_name
         self.table = self.db.get_table(self.table_name)
         self.condition = condition if condition else "1=1"
-        self.limit = limit
+        self.batch_size = batch_size or self.default_batch_size
+        self._limit_num = limit
 
-    def _read_dataset(self, text):
-        return Dataset((r for r in self.db.read(text)))
+    def _get_dataset(self, text):
+        return Dataset((r for r in self.db.read(text, batch_size=self.batch_size)))
 
     def _query_text(self, columns):
         fields = [f"{col} as {alias}" for col, alias in columns.items()]
         return " ".join(["select", ",".join(fields), "from", self.table_name])
 
-    def read(self, columns):
+    def get_dataset(self, columns):
         text = self._query_text(columns)
         if isinstance(self.condition, str):
             text = f"{text} where {self.condition}"
-            dataset = self._read_dataset(text)
+            dataset = self._get_dataset(text)
         elif callable(self.condition):
-            dataset = self._read_dataset(text).filter(self.condition)
+            dataset = self._get_dataset(text).filter(self.condition)
         else:
             raise ValueError("condition 参数类型错误")
-        if isinstance(self.limit, int):
-            return dataset.limit(self.limit)
-        else:
-            return dataset
+        return dataset
 
     @property
     def columns(self):
@@ -64,11 +70,12 @@ class DatabaseReader(DatabaseConnection, Reader):
 
 class FileReader(Reader):
 
-    def __init__(self, file_path, pd_params=None):
+    def __init__(self, file_path, pd_params=None, limit=None):
         self.file_path = file_path
+        self._limit_num = limit
         if pd_params is None:
             pd_params = {}
-        pd_params.setdefault("chunksize", 10000)
+        pd_params.setdefault("chunksize", self.default_batch_size)
         self.file = pandas.read_csv(self.file_path, **pd_params)
 
     def _get_records(self, columns):
@@ -77,7 +84,7 @@ class FileReader(Reader):
             for record in df.to_dict("records"):
                 yield record
 
-    def read(self, columns):
+    def get_dataset(self, columns):
         return Dataset(self._get_records(columns))
 
     @property
@@ -89,11 +96,12 @@ class FileReader(Reader):
 
 class ExcelReader(Reader):
 
-    def __init__(self, file, sheet_name=0, pd_params=None, detect_table_border=True):
+    def __init__(self, file, sheet_name=0, pd_params=None, limit=None, detect_table_border=True):
         if pd_params is None:
             pd_params = {}
         pd_params.setdefault("dtype", 'object')
         self.sheet_name = sheet_name
+        self._limit_num = limit
         if isinstance(file, str):
             file = pandas.ExcelFile(file)
             self.df = file.parse(self.sheet_name, **pd_params)
@@ -106,7 +114,7 @@ class ExcelReader(Reader):
         if detect_table_border:
             self.detect_table_border()
 
-    def read(self, columns):
+    def get_dataset(self, columns):
         df = self.df.where(self.df.notnull(), None).rename(columns=columns)
         return Dataset(df.to_dict("records"))
 
@@ -136,14 +144,15 @@ class ExcelReader(Reader):
 
 class ElasticsearchReader(ElasticsearchConnection, Reader):
 
-    def __init__(self, index_name, doc_type=None, es_params=None, batch_size=10000):
+    def __init__(self, index_name, doc_type=None, es_params=None, batch_size=None, limit=None):
         super().__init__(es_params)
         self.index_name = index_name
         self.doc_type = doc_type
-        self.batch_size = batch_size
+        self.batch_size = batch_size or self.default_batch_size
+        self._limit_num = limit
         self.index = self.client.get_index(self.index_name, self.doc_type)
 
-    def read(self, columns):
+    def get_dataset(self, columns):
         return Dataset(doc["_source"] for doc in self.index.scan()).rename_and_extract(columns)
 
     @property

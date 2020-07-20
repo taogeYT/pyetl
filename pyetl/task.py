@@ -4,7 +4,9 @@
 @desc:
 """
 from pyetl.mapping import ColumnsMapping, Mapping
+from pyetl.reader import Reader
 from pyetl.utils import print_run_time, validate_param
+from pyetl.writer import Writer
 
 
 class Task(object):
@@ -21,6 +23,10 @@ class Task(object):
             self.writer = writer
         if not getattr(self, 'reader', None):
             raise ValueError("%s must have a reader" % type(self).__name__)
+        if not isinstance(self.reader, Reader):
+            raise ValueError("reader类型错误")
+        if self.writer and not isinstance(self.writer, Writer):
+            raise ValueError("writer类型错误")
         if columns is not None:
             self.columns = columns
         if functions is not None:

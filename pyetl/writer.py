@@ -3,9 +3,12 @@
 @time: 2020/4/30 11:28 上午
 @desc:
 """
+import hashlib
 import os
 import random
+import shutil
 import sys
+import time
 from abc import ABC, abstractmethod
 from multiprocessing.pool import Pool
 
@@ -85,39 +88,58 @@ class HiveWriter2(HiveWriter):
     """
     insert dataset to hive table by 'load data' sql
     """
+    cache_file = ".pyetl_hive_cache"
 
-    def __init__(self, db, table_name, batch_size=None):
+    def __init__(self, db, table_name, batch_size=1000000, hadoop_path=None, delimited="\001"):
         super().__init__(db, table_name, batch_size)
-        self.local_file_name = self._get_local_file_name()
+        self.file_name = self._get_local_file_name()
+        self.local_path = os.path.join(self.cache_file, self.file_name)
+        self.delimited = delimited
+        self.hadoop = hadoop_path if hadoop_path else "hadoop"
 
     def _get_local_file_name(self):
         # 注意 table_name 可能是多表关联多情况，如 t1 left t2 using(uuid)
-        code = random.randint(1000, 9999)
-        return f"pyetl_dst_table_{'_'.join(self.table_name.split())}_{code}"
+        # code = random.randint(1000, 9999)
+        # return f"pyetl_dst_table_{'_'.join(self.table_name.split())}_{code}"
+        uuid = hashlib.md5(self.table_name.encode())
+        return f"{uuid.hexdigest()}-{int(time.time())}"
+
+    def clear(self):
+        shutil.rmtree(self.local_path)
 
     def write(self, dataset):
-        self.to_csv(dataset)
-        self.load_data()
+        file_writer = FileWriter(
+            self.local_path, header=False, sep=self.delimited, columns=self.columns, batch_size=self.batch_size)
+        file_writer.write(dataset.map(self.complete_all_fields))
+        try:
+            self.load_data()
+        finally:
+            self.clear()
 
     def to_csv(self, dataset):
-        # dataset.to_df().to_csv(tmp_file, index=None, header=False, sep="\001", columns=self.columns)
         dataset.map(self.complete_all_fields).to_csv(
-            self.local_file_name, header=False, sep="\001", columns=self.columns, batch_size=self.batch_size)
+            self.local_path, header=False, sep="\001", columns=self.columns, batch_size=self.batch_size)
 
     def load_data(self):
-        if os.system(f"hadoop fs -put {self.local_file_name} /tmp/{self.local_file_name}") == 0:
-            self.db.write(f"load data inpath '/tmp/{self.local_file_name}' into table {self.table_name}")
+        if os.system(f"{self.hadoop} fs -put {self.local_path} /tmp/{self.file_name}") == 0:
+            self.db.execute(f"load data inpath '/tmp/{self.file_name}' into table {self.table_name}")
         else:
-            print("上传HDFS失败:", self.local_file_name)
+            print("上传HDFS失败:", self.file_name)
 
 
 class FileWriter(Writer):
 
-    def __init__(self, file_path, batch_size=None, header=True, sep=","):
+    def __init__(self, file_path, batch_size=None, header=True, sep=",", columns=None):
         self.file_path = file_path
+        os.makedirs(self.file_path)
         self.batch_size = batch_size or self.default_batch_size
-        self.header = header
-        self.sep = sep
+        self.kw = dict(header=header, sep=sep, columns=columns)
 
     def write(self, dataset):
-        dataset.to_csv(self.file_path, header=self.header, sep=self.sep, batch_size=self.batch_size)
+        self.to_csv(dataset, self.file_path, batch_size=self.batch_size, **self.kw)
+
+    @classmethod
+    def to_csv(cls, dataset, path, batch_size=100000, **kwargs):
+        for i, df in enumerate(dataset.to_df(batch_size=batch_size)):
+            file = os.path.join(path, f"{i:0>8}")
+            df.to_csv(file, index=False, **kwargs)
