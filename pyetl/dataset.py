@@ -88,9 +88,9 @@ class Dataset(object):
         if batch_size is None:
             return pandas.DataFrame.from_records(self)
         else:
-            return self._to_df_iterator(batch_size)
+            return self._df_generator(batch_size)
 
-    def _to_df_iterator(self, batch_size):
+    def _df_generator(self, batch_size):
         while 1:
             records = self.get(batch_size)
             if records:
