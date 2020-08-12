@@ -115,7 +115,16 @@ class ExcelReader(Reader):
             self.detect_table_border()
 
     def get_dataset(self, columns):
-        df = self.df.where(self.df.notnull(), None).rename(columns=columns)
+        df = self.df.where(self.df.notnull(), None)
+        df=df.reset_index() 
+
+        ss=[s for s, t in columns.items() if s in list(df)]
+        tt=[t for s, t in columns.items() if s in list(df)]
+        df = df.loc[:,ss]
+
+        df.columns=tt
+        df=df.fillna(value='')
+        df=df.astype(str)
         return Dataset(df.to_dict("records"))
 
     @property
