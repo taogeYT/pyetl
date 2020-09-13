@@ -10,27 +10,31 @@ pip3 install pyetl
 ## Example
 
 ```python
-from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticsearchWriter, HiveWriter2
-db_reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
-db_writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
-hive_writer = HiveWriter2("hive://localhost:10000/default", table_name="target_table")
-es_writer = ElasticsearchWriter(index_name="tartget_index")
-
+import sqlite3
+import pymysql
+from pyetl import Task, DatabaseReader, DatabaseWriter, ElasticsearchWriter, FileWriter
+src = sqlite3.connect("file.db")
+reader = DatabaseReader(src, table_name="source_table")
 # 数据库之间数据同步，表到表传输
-Task(db_reader, db_writer).start()
-# 数据库到hive表同步
-Task(db_reader, hive_writer).start()
+dst = pymysql.connect(host="localhost", user="your_user", password="your_password", db="test")
+writer = DatabaseWriter(dst, table_name="target_table")
+Task(reader, writer).start()
+# 数据库表导出到文件
+writer = FileWriter(file_path="./", file_name="file.csv")
+Task(reader, writer).start()
 # 数据库表同步es
-Task(db_reader, es_writer).start()
+writer = ElasticsearchWriter(index_name="target_index")
+Task(reader, writer).start()
 ```
 
 #### 原始表目标表字段名称不同
 
 ```python
+from pyetl import Task, DatabaseReader, DatabaseWriter
 # 原始表source_table包含uuid，full_name字段
-reader = DatabaseReader("sqlite:///db.sqlite3", table_name="source_table")
+reader = DatabaseReader("sqlite:///file.db", table_name="source_table")
 # 目标表target_table包含id，name字段
-writer = DatabaseWriter("sqlite:///db.sqlite3", table_name="target_table")
+writer = DatabaseWriter("sqlite:///file.db", table_name="target_table")
 # columns配置目标表和原始表的字段映射
 columns = {"id": "uuid", "name": "full_name"}
 Task(reader, writer, columns=columns).start()
