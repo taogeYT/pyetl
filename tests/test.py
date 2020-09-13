@@ -11,7 +11,7 @@ from pydbclib import connect
 from pyetl.dataset import Dataset
 from pyetl.task import Task
 from pyetl.reader import DatabaseReader, FileReader, ExcelReader
-from pyetl.writer import DatabaseWriter, FileWriter
+from pyetl.writer import DatabaseWriter, FileWriter, HiveWriter
 
 
 class BaseTest(unittest.TestCase):
@@ -24,11 +24,13 @@ class BaseTest(unittest.TestCase):
     def get_file_path(cls, name):
         return os.path.join(os.path.dirname(__file__), 'data', name)
 
+    @staticmethod
+    def get_db():
+        return connect("sqlite:///:memory:")
+
     @classmethod
     def setUpClass(cls):
-        # path = cls.get_file_path("src.db")
-        # path = "sqlite:///" + path
-        cls.db = connect("sqlite:///:memory:")
+        cls.db = cls.get_db()
         create_src = """CREATE TABLE "src" ("uuid" INTEGER NOT NULL,"full_name" TEXT,PRIMARY KEY ("uuid"))"""
         cls.db.execute(create_src)
         create_dst = """CREATE TABLE "dst" ("id" INTEGER NOT NULL,"name" TEXT,PRIMARY KEY ("id"))"""
@@ -58,6 +60,11 @@ class TestReader(BaseTest):
         reader = DatabaseReader(self.db, "src")
         self.validate(reader)
 
+    def test_db_reader_by_engine(self):
+        engine = self.db.driver.engine
+        reader = DatabaseReader(engine, "src")
+        self.validate(reader)
+
     def test_file_reader(self):
         reader = FileReader(self.get_file_path("src.txt"))
         self.validate(reader)
@@ -69,8 +76,20 @@ class TestReader(BaseTest):
 
 class TestWriter(BaseTest):
 
+    @staticmethod
+    def get_db():
+        return connect(":memory:", driver="sqlite3")
+
     def test_db_writer(self):
         writer = DatabaseWriter(self.db, "dst")
+        writer.table.delete("1=1")
+        writer.write(self.get_dataset(self.dst_record))
+        task = Task(DatabaseReader(self.db, "dst"))
+        self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
+
+    def test_db_reader_by_con(self):
+        con = self.db.driver.con
+        writer = DatabaseWriter(con, "dst")
         writer.table.delete("1=1")
         writer.write(self.get_dataset(self.dst_record))
         task = Task(DatabaseReader(self.db, "dst"))
@@ -82,6 +101,28 @@ class TestWriter(BaseTest):
         writer = FileWriter(path, name)
         writer.write(self.get_dataset(self.dst_record))
         task = Task(FileReader(file))
+        self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
+
+
+class TestHiveWriter(BaseTest):
+
+    @staticmethod
+    def get_db():
+        return connect("hive://localhost:10000/default")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.db = cls.get_db()
+        create_src = """CREATE TABLE src (uuid int,full_name string)"""
+        cls.db.execute(create_src)
+        create_dst = """CREATE TABLE dst (id int,name string)"""
+        cls.db.execute(create_dst)
+        cls.db.get_table("src").insert(cls.src_record)
+
+    def test_hive_writer(self):
+        writer = HiveWriter(self.db, "dst")
+        writer.write(self.get_dataset(self.dst_record))
+        task = Task(DatabaseReader(self.db, "dst"))
         self.assertEqual(task.dataset.get_all(), self.get_dataset(self.dst_record).get_all())
 
 
