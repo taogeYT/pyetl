@@ -30,11 +30,13 @@ Task(reader, writer).start()
 #### 原始表目标表字段名称不同
 
 ```python
+import sqlite3
 from pyetl import Task, DatabaseReader, DatabaseWriter
+con = sqlite3.connect("file.db")
 # 原始表source_table包含uuid，full_name字段
-reader = DatabaseReader("sqlite:///file.db", table_name="source_table")
+reader = DatabaseReader(con, table_name="source_table")
 # 目标表target_table包含id，name字段
-writer = DatabaseWriter("sqlite:///file.db", table_name="target_table")
+writer = DatabaseWriter(con, table_name="target_table")
 # columns配置目标表和原始表的字段映射
 columns = {"id": "uuid", "name": "full_name"}
 Task(reader, writer, columns=columns).start()
