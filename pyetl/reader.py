@@ -80,7 +80,7 @@ class FileReader(Reader):
 
     def _get_records(self, columns):
         for df in self.file:
-            df = df.where(df.notnull(), None).rename(columns=columns)
+            df = df.where(df.notnull(), None).reindex(columns=columns).rename(columns=columns)
             for record in df.to_dict("records"):
                 yield record
 
@@ -115,7 +115,7 @@ class ExcelReader(Reader):
             self.detect_table_border()
 
     def get_dataset(self, columns):
-        df = self.df.where(self.df.notnull(), None).rename(columns=columns)
+        df = self.df.where(self.df.notnull(), None).reindex(columns=columns).rename(columns=columns)
         return Dataset(df.to_dict("records"))
 
     @property
