@@ -4,6 +4,7 @@
 @desc:
 """
 from pydbclib import connect, Database
+from sqlalchemy import engine
 
 from pyetl.es import Client
 
@@ -13,6 +14,8 @@ class DatabaseConnection(object):
     def __init__(self, db):
         if isinstance(db, Database):
             self.db = db
+        elif isinstance(db, engine.base.Engine) or hasattr(db, "cursor"):
+            self.db = connect(driver=db)
         elif isinstance(db, dict):
             self.db = connect(**db)
         elif isinstance(db, str):
