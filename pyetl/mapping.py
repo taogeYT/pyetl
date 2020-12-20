@@ -23,7 +23,7 @@ class ColumnsMapping(object):
         columns = {}
         for k, v in self.raw_columns.items():
             if isinstance(v, (list, tuple)):
-                columns[k] = (alias[n] for n in v)
+                columns[k] = tuple(alias[n] for n in v)
             else:
                 columns[k] = alias[v]
         return alias, columns
