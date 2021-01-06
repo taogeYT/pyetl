@@ -7,5 +7,5 @@ from .task import Task
 from .reader import DatabaseReader, FileReader, ExcelReader, ElasticsearchReader
 from .writer import DatabaseWriter, ElasticsearchWriter, HiveWriter, HiveWriter2, FileWriter
 
-__version__ = '2.2.1'
+__version__ = '2.2.2'
 __author__ = "liyatao"

@@ -73,7 +73,9 @@ class HiveWriter(DatabaseConnection, Writer):
     @property
     def columns(self):
         if self._columns is None:
-            self._columns = self.db.execute(f"select * from {self.table_name} limit 0").get_columns()
+            r = self.db.execute(f"select * from {self.table_name} limit 0")
+            r.fetchall()
+            self._columns = r.get_columns()
         return self._columns
 
     def complete_all_fields(self, record):
